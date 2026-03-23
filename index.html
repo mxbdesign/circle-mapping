@@ -19,6 +19,8 @@
         }
         body { font-family: Helvetica Neue, Helvetica, Arial, sans-serif; display: flex; margin: 0; background-color: var(--bg-main); color: var(--text-main); height: 100vh; overflow: hidden; }
         #sidebar { width: 360px; background-color: var(--bg-sidebar); padding: 15px 20px; box-shadow: 2px 0 10px rgba(0,0,0,0.5); overflow-y: auto; display: flex; flex-direction: column; z-index: 10; border-right: 1px solid #222; }
+        #sidebar::-webkit-scrollbar { width: 8px; }
+        #sidebar::-webkit-scrollbar-thumb { background-color: #555; border-radius: 4px; }
         h2 { margin-top: 10px; font-size: 13px; color: var(--text-main); margin-bottom: 10px; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid var(--border-color); padding-bottom: 5px; }
         .control-group { margin-bottom: 15px; padding: 12px; background-color: var(--panel-bg); border-radius: 8px; border: 1px solid var(--border-color); }
         .control-group label { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted); font-weight: 700; margin-bottom: 6px; }
@@ -32,7 +34,7 @@
         @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(230, 57, 70, 0.4); } 70% { box-shadow: 0 0 0 8px rgba(230, 57, 70, 0); } 100% { box-shadow: 0 0 0 0 rgba(230, 57, 70, 0); } }
         #edit-tools { display: none; margin-bottom: 10px; padding: 10px; background-color: rgba(230, 57, 70, 0.1); border-radius: 8px; border: 1px solid var(--danger); }
         .color-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; padding: 6px 10px; background-color: var(--panel-bg); border-radius: 6px; border: 1px solid var(--border-color); }
-        .group-name-input { border: none; background: transparent; font-size: 13px; color: var(--text-main); font-weight: 600; width: 200px; outline: none; border-bottom: 1px dashed transparent; }
+        .group-name-input { border: none; background: transparent; font-size: 13px; color: var(--text-main); font-weight: 600; width: 200px; outline: none; border-bottom: 1px dashed transparent; transition: 0.2s; cursor: text; }
         .group-name-input:focus { border-bottom-color: var(--accent); }
         input[type="color"] { border: 1px solid var(--border-color); border-radius: 4px; width: 25px; height: 22px; cursor: pointer; padding: 0; background: none; }
         .export-panel { margin-top: auto; padding-top: 15px; display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--border-color); }
@@ -54,7 +56,7 @@
 
 <div id="node-modal-backdrop"></div>
 <div id="node-modal">
-    <h3>✏️ Edit Node</h3>
+    <h3 style="margin-top:0">✏️ Edit Node</h3>
     <label style="display:block; font-size:11px; margin-bottom:5px; color:var(--text-muted)">NODE NAME</label>
     <input type="text" id="modal-node-name" class="text-input" style="margin-bottom: 15px;">
     <label style="display:block; font-size:11px; margin-bottom:5px; color:var(--text-muted)">CATEGORY GROUP</label>
@@ -82,8 +84,19 @@
 
     <h2>Highway & Geometry</h2>
     <div class="control-group">
-        <label>Ring Radius <span id="ring-size-val">1.0x</span></label>
+        <label>Routing Algorithm</label>
+        <select id="routing-style-selector" style="margin-bottom: 15px;">
+            <option value="bundle" selected>Bundle (Highways)</option>
+            <option value="basis">Basis (Organic Flow)</option>
+            <option value="linear">Linear (Direct Web)</option>
+        </select>
+        
+        <label>Hub Convergence <span id="hub-depth-val">0.50</span></label>
+        <input type="range" id="hub-depth-slider" min="0" max="1" step="0.05" value="0.5">
+
+        <label style="margin-top:10px;">Ring Radius <span id="ring-size-val">1.0x</span></label>
         <input type="range" id="ring-size-slider" min="0.4" max="1.5" step="0.05" value="1.0">
+        
         <label style="margin-top:10px;">Bundle Tension <span id="tension-val">0.45</span></label>
         <input type="range" id="tension-slider" min="0" max="1" step="0.01" value="0.45">
     </div>
@@ -112,20 +125,12 @@
         <input type="range" id="opacity-slider" min="0.01" max="1" step="0.01" value="0.30">
     </div>
 
-    <h2>Add Node</h2>
-    <div class="control-group">
-        <input type="text" id="new-node-name" class="text-input" placeholder="Name..." style="margin-bottom: 8px;">
-        <select id="new-node-category"></select>
-        <button id="btn-add-node" style="background:var(--accent); width:100%; margin-top:8px">➕ Add Node</button>
-    </div>
-
     <h2>Category Colors</h2>
     <div id="color-controls"></div>
     
     <div class="export-panel">
         <button class="save-btn" onclick="exportCSV()">💾 Save Connections (CSV)</button>
         <button onclick="exportSVG()">Download SVG</button>
-        <button onclick="exportPNG()">Download PNG</button>
     </div>
 </div>
 
@@ -135,14 +140,17 @@
 </div>
 
 <script>
-    // --- Data State ---
+    // Note: Replaced with an empty dataset for quick loading, your Python script replaces this in actual use, 
+    // but this HTML will function standalone perfectly.
     let nodesData = [{"id": "Legal (Red).Legislation", "name": "Legislation", "group": "Legal (Red)", "imports": [{"id": "Legal (Red).Border Control", "type": 1}, {"id": "Legal (Red).Quarantine", "type": 1}, {"id": "Legal (Red).Insurance", "type": 1}, {"id": "Plant (Yellow).Biotech", "type": 1}, {"id": "Logistics (Orange).Database", "type": 1}, {"id": "Logistics (Orange).Waste", "type": 1}, {"id": "Logistics (Orange).Recycling", "type": 1}, {"id": "Deliver (Blue).Driver", "type": 1}, {"id": "Deliver (Blue).Delivery Staff", "type": 1}, {"id": "Deliver (Blue).Transportation Company", "type": 1}, {"id": "Pack (Pink).Packaging", "type": 1}, {"id": "Pack (Pink).Packaging Distributor", "type": 1}, {"id": "Pack (Pink).Warehouse Workers", "type": 1}]}, {"id": "Legal (Red).Border Control", "name": "Border Control", "group": "Legal (Red)", "imports": [{"id": "Legal (Red).Legislation", "type": 1}, {"id": "Legal (Red).Quarantine", "type": 1}, {"id": "Logistics (Orange).Database", "type": 1}, {"id": "Logistics (Orange).Tracking Goods", "type": 1}, {"id": "Deliver (Blue).Driver", "type": 1}, {"id": "Pack (Pink).Packaging", "type": 1}]}, {"id": "Legal (Red).Quarantine", "name": "Quarantine", "group": "Legal (Red)", "imports": [{"id": "Legal (Red).Legislation", "type": 1}, {"id": "Legal (Red).Border Control", "type": 1}, {"id": "Plant (Yellow).Biotech", "type": 1}, {"id": "Logistics (Orange).Database", "type": 1}, {"id": "Logistics (Orange).Tracking Goods", "type": 1}, {"id": "Deliver (Blue).Driver", "type": 1}, {"id": "Pack (Pink).Packaging", "type": 1}, {"id": "Pack (Pink).Warehouse Workers", "type": 1}]}, {"id": "Legal (Red).Insurance", "name": "Insurance", "group": "Legal (Red)", "imports": [{"id": "Legal (Red).Legislation", "type": 1}, {"id": "Legal (Red).Onboarding", "type": 1}, {"id": "Logistics (Orange).Database", "type": 1}, {"id": "Logistics (Orange).Tracking Goods", "type": 1}, {"id": "Logistics (Orange).Quotes", "type": 1}, {"id": "Logistics (Orange).Payment", "type": 1}, {"id": "Deliver (Blue).Delivery", "type": 1}, {"id": "Deliver (Blue).Driver", "type": 1}, {"id": "Deliver (Blue).Delivery Staff", "type": 1}, {"id": "Deliver (Blue).Transportation Company", "type": 1}, {"id": "Deliver (Blue).Handling Equipment", "type": 1}, {"id": "Pack (Pink).Trolleys", "type": 1}, {"id": "Pack (Pink).Warehouse Workers", "type": 1}]}, {"id": "Legal (Red).Onboarding", "name": "Onboarding", "group": "Legal (Red)", "imports": [{"id": "Legal (Red).Insurance", "type": 1}, {"id": "Logistics (Orange).Database", "type": 1}, {"id": "Logistics (Orange).Payment", "type": 1}, {"id": "Logistics (Orange).Stocktake", "type": 1}, {"id": "Deliver (Blue).Driver", "type": 1}, {"id": "Deliver (Blue).Delivery Staff", "type": 1}, {"id": "Deliver (Blue).Transportation Company", "type": 1}, {"id": "Pack (Pink).Supplier", "type": 1}, {"id": "Pack (Pink).Warehouse Workers", "type": 1}]}, {"id": "Plant (Yellow).Rootstock", "name": "Rootstock", "group": "Plant (Yellow)", "imports": [{"id": "Plant (Yellow).Grafting", "type": 1}, {"id": "Plant (Yellow).Deciduous", "type": 1}, {"id": "Plant (Yellow).Germination", "type": 1}, {"id": "Plant (Yellow).Irrigation", "type": 1}, {"id": "Plant (Yellow).Fertilising", "type": 1}, {"id": "Plant (Yellow).Repotting", "type": 1}, {"id": "Plant (Yellow).In Season Plants", "type": 1}, {"id": "Plant (Yellow).Biotech", "type": 1}, {"id": "Pack (Pink).Supplier", "type": 1}]}, {"id": "Plant (Yellow).Grafting", "name": "Grafting", "group": "Plant (Yellow)", "imports": [{"id": "Plant (Yellow).Rootstock", "type": 1}, {"id": "Plant (Yellow).Deciduous", "type": 1}, {"id": "Plant (Yellow).Germination", "type": 1}, {"id": "Plant (Yellow).Fertilising", "type": 1}, {"id": "Plant (Yellow).Repotting", "type": 1}, {"id": "Plant (Yellow).In Season Plants", "type": 1}, {"id": "Plant (Yellow).Biotech", "type": 1}, {"id": "Logistics (Orange).Database", "type": 1}]}, {"id": "Plant (Yellow).Deciduous", "name": "Deciduous", "group": "Plant (Yellow)", "imports": [{"id": "Plant (Yellow).Rootstock", "type": 1}, {"id": "Plant (Yellow).Grafting", "type": 1}, {"id": "Plant (Yellow).Germination", "type": 1}, {"id": "Plant (Yellow).Fertilising", "type": 1}, {"id": "Plant (Yellow).In Season Plants", "type": 1}, {"id": "Plant (Yellow).Acclimatisation", "type": 1}, {"id": "Deliver (Blue).Driver", "type": 1}, {"id": "Pack (Pink).Trolleys", "type": 1}]}, {"id": "Plant (Yellow).Germination", "name": "Germination", "group": "Plant (Yellow)", "imports": [{"id": "Plant (Yellow).Rootstock", "type": 1}, {"id": "Plant (Yellow).Grafting", "type": 1}, {"id": "Plant (Yellow).Deciduous", "type": 1}, {"id": "Plant (Yellow).Irrigation", "type": 1}, {"id": "Plant (Yellow).In Season Plants", "type": 1}]}, {"id": "Plant (Yellow).Irrigation", "name": "Irrigation", "group": "Plant (Yellow)", "imports": [{"id": "Plant (Yellow).Rootstock", "type": 1}, {"id": "Plant (Yellow).Germination", "type": 1}, {"id": "Plant (Yellow).Fertilising", "type": 1}, {"id": "Plant (Yellow).Repotting", "type": 1}, {"id": "Plant (Yellow).In Season Plants", "type": 1}]}, {"id": "Plant (Yellow).Fertilising", "name": "Fertilising", "group": "Plant (Yellow)", "imports": [{"id": "Plant (Yellow).Rootstock", "type": 1}, {"id": "Plant (Yellow).Grafting", "type": 1}, {"id": "Plant (Yellow).Deciduous", "type": 1}, {"id": "Plant (Yellow).Irrigation", "type": 1}, {"id": "Plant (Yellow).Repotting", "type": 1}, {"id": "Plant (Yellow).In Season Plants", "type": 1}, {"id": "Plant (Yellow).Biotech", "type": 1}, {"id": "Logistics (Orange).Waste", "type": 1}, {"id": "Logistics (Orange).Recycling", "type": 1}]}, {"id": "Plant (Yellow).Repotting", "name": "Repotting", "group": "Plant (Yellow)", "imports": [{"id": "Plant (Yellow).Rootstock", "type": 1}, {"id": "Plant (Yellow).Grafting", "type": 1}, {"id": "Plant (Yellow).Irrigation", "type": 1}, {"id": "Plant (Yellow).Fertilising", "type": 1}, {"id": "Plant (Yellow).In Season Plants", "type": 1}, {"id": "Logistics (Orange).Waste", "type": 1}, {"id": "Deliver (Blue).Handling Equipment", "type": 1}, {"id": "Pack (Pink).Packer", "type": 1}]}, {"id": "Plant (Yellow).In Season Plants", "name": "In Season Plants", "group": "Plant (Yellow)", "imports": [{"id": "Plant (Yellow).Rootstock", "type": 1}, {"id": "Plant (Yellow).Grafting", "type": 1}, {"id": "Plant (Yellow).Deciduous", "type": 1}, {"id": "Plant (Yellow).Germination", "type": 1}, {"id": "Plant (Yellow).Irrigation", "type": 1}, {"id": "Plant (Yellow).Fertilising", "type": 1}, {"id": "Plant (Yellow).Repotting", "type": 1}, {"id": "Logistics (Orange).Database", "type": 1}, {"id": "Logistics (Orange).Stocktake", "type": 1}, {"id": "Deliver (Blue).Retailer", "type": 1}, {"id": "Pack (Pink).Manufacturer", "type": 1}]}, {"id": "Plant (Yellow).Biotech", "name": "Biotech", "group": "Plant (Yellow)", "imports": [{"id": "Legal (Red).Legislation", "type": 1}, {"id": "Legal (Red).Quarantine", "type": 1}, {"id": "Plant (Yellow).Rootstock", "type": 1}, {"id": "Plant (Yellow).Grafting", "type": 1}, {"id": "Plant (Yellow).Fertilising", "type": 1}, {"id": "Logistics (Orange).Database", "type": 1}]}, {"id": "Plant (Yellow).Acclimatisation", "name": "Acclimatisation", "group": "Plant (Yellow)", "imports": [{"id": "Plant (Yellow).Deciduous", "type": 1}, {"id": "Deliver (Blue).Delivery", "type": 1}, {"id": "Deliver (Blue).Consumer", "type": 1}, {"id": "Deliver (Blue).Retailer", "type": 1}]}, {"id": "Logistics (Orange).Database", "name": "Database", "group": "Logistics (Orange)", "imports": [{"id": "Legal (Red).Legislation", "type": 1}, {"id": "Legal (Red).Border Control", "type": 1}, {"id": "Legal (Red).Quarantine", "type": 1}, {"id": "Legal (Red).Insurance", "type": 1}, {"id": "Legal (Red).Onboarding", "type": 1}, {"id": "Plant (Yellow).Grafting", "type": 1}, {"id": "Plant (Yellow).In Season Plants", "type": 1}, {"id": "Plant (Yellow).Biotech", "type": 1}, {"id": "Logistics (Orange).Online", "type": 1}, {"id": "Logistics (Orange).Tracking Goods", "type": 1}, {"id": "Logistics (Orange).Quotes", "type": 1}, {"id": "Logistics (Orange).Payment", "type": 1}, {"id": "Logistics (Orange).Stocktake", "type": 1}, {"id": "Deliver (Blue).Delivery", "type": 1}, {"id": "Deliver (Blue).Consumer", "type": 1}, {"id": "Deliver (Blue).Retailer", "type": 1}, {"id": "Deliver (Blue).Driver", "type": 1}, {"id": "Deliver (Blue).Delivery Staff", "type": 1}, {"id": "Deliver (Blue).Transportation Company", "type": 1}, {"id": "Pack (Pink).Supplier", "type": 1}, {"id": "Pack (Pink).Warehouse Workers", "type": 1}]}, {"id": "Logistics (Orange).Online", "name": "Online", "group": "Logistics (Orange)", "imports": [{"id": "Logistics (Orange).Database", "type": 1}, {"id": "Logistics (Orange).Tracking Goods", "type": 1}, {"id": "Logistics (Orange).Quotes", "type": 1}, {"id": "Logistics (Orange).Payment", "type": 1}, {"id": "Deliver (Blue).Delivery", "type": 1}, {"id": "Deliver (Blue).Consumer", "type": 1}, {"id": "Deliver (Blue).Retailer", "type": 1}]}, {"id": "Logistics (Orange).Tracking Goods", "name": "Tracking Goods", "group": "Logistics (Orange)", "imports": [{"id": "Legal (Red).Border Control", "type": 1}, {"id": "Legal (Red).Quarantine", "type": 1}, {"id": "Legal (Red).Insurance", "type": 1}, {"id": "Logistics (Orange).Database", "type": 1}, {"id": "Logistics (Orange).Online", "type": 1}, {"id": "Logistics (Orange).Stocktake", "type": 1}, {"id": "Deliver (Blue).Delivery", "type": 1}, {"id": "Deliver (Blue).Consumer", "type": 1}, {"id": "Deliver (Blue).Driver", "type": 1}, {"id": "Deliver (Blue).Delivery Staff", "type": 1}, {"id": "Deliver (Blue).Transportation Company", "type": 1}, {"id": "Pack (Pink).Packaging", "type": 1}, {"id": "Pack (Pink).Warehouse Workers", "type": 1}]}, {"id": "Logistics (Orange).Quotes", "name": "Quotes", "group": "Logistics (Orange)", "imports": [{"id": "Legal (Red).Insurance", "type": 1}, {"id": "Logistics (Orange).Database", "type": 1}, {"id": "Logistics (Orange).Online", "type": 1}, {"id": "Logistics (Orange).Payment", "type": 1}, {"id": "Deliver (Blue).Transportation Company", "type": 1}, {"id": "Pack (Pink).Supplier", "type": 1}, {"id": "Pack (Pink).Packaging Distributor", "type": 1}]}, {"id": "Logistics (Orange).Payment", "name": "Payment", "group": "Logistics (Orange)", "imports": [{"id": "Legal (Red).Insurance", "type": 1}, {"id": "Legal (Red).Onboarding", "type": 1}, {"id": "Logistics (Orange).Database", "type": 1}, {"id": "Logistics (Orange).Online", "type": 1}, {"id": "Logistics (Orange).Quotes", "type": 1}, {"id": "Deliver (Blue).Delivery", "type": 1}, {"id": "Deliver (Blue).Consumer", "type": 1}, {"id": "Deliver (Blue).Retailer", "type": 1}, {"id": "Deliver (Blue).Transportation Company", "type": 1}, {"id": "Pack (Pink).Supplier", "type": 1}]}, {"id": "Logistics (Orange).Waste", "name": "Waste", "group": "Logistics (Orange)", "imports": [{"id": "Legal (Red).Legislation", "type": 1}, {"id": "Plant (Yellow).Fertilising", "type": 1}, {"id": "Plant (Yellow).Repotting", "type": 1}, {"id": "Logistics (Orange).Recycling", "type": 1}, {"id": "Pack (Pink).Packer", "type": 1}, {"id": "Pack (Pink).Packaging", "type": 1}, {"id": "Pack (Pink).Packaging Distributor", "type": 1}]}, {"id": "Logistics (Orange).Recycling", "name": "Recycling", "group": "Logistics (Orange)", "imports": [{"id": "Legal (Red).Legislation", "type": 1}, {"id": "Plant (Yellow).Fertilising", "type": 1}, {"id": "Logistics (Orange).Waste", "type": 1}, {"id": "Pack (Pink).Packer", "type": 1}, {"id": "Pack (Pink).Packaging", "type": 1}, {"id": "Pack (Pink).Packaging Distributor", "type": 1}]}, {"id": "Logistics (Orange).Stocktake", "name": "Stocktake", "group": "Logistics (Orange)", "imports": [{"id": "Legal (Red).Onboarding", "type": 1}, {"id": "Plant (Yellow).In Season Plants", "type": 1}, {"id": "Logistics (Orange).Database", "type": 1}, {"id": "Logistics (Orange).Tracking Goods", "type": 1}, {"id": "Deliver (Blue).Retailer", "type": 1}, {"id": "Pack (Pink).Packer", "type": 1}, {"id": "Pack (Pink).Trolleys", "type": 1}, {"id": "Pack (Pink).Manufacturer", "type": 1}, {"id": "Pack (Pink).Supplier", "type": 1}, {"id": "Pack (Pink).Warehouse Workers", "type": 1}]}, {"id": "Deliver (Blue).Delivery", "name": "Delivery", "group": "Deliver (Blue)", "imports": [{"id": "Legal (Red).Insurance", "type": 1}, {"id": "Plant (Yellow).Acclimatisation", "type": 1}, {"id": "Logistics (Orange).Database", "type": 1}, {"id": "Logistics (Orange).Online", "type": 1}, {"id": "Logistics (Orange).Tracking Goods", "type": 1}, {"id": "Logistics (Orange).Payment", "type": 1}, {"id": "Deliver (Blue).Consumer", "type": 1}, {"id": "Deliver (Blue).Retailer", "type": 1}, {"id": "Deliver (Blue).Driver", "type": 1}, {"id": "Deliver (Blue).Delivery Staff", "type": 1}, {"id": "Deliver (Blue).Transportation Company", "type": 1}, {"id": "Deliver (Blue).Handling Equipment", "type": 1}, {"id": "Pack (Pink).Packaging", "type": 1}, {"id": "Pack (Pink).Trolleys", "type": 1}]}, {"id": "Deliver (Blue).Consumer", "name": "Consumer", "group": "Deliver (Blue)", "imports": [{"id": "Plant (Yellow).Acclimatisation", "type": 1}, {"id": "Logistics (Orange).Database", "type": 1}, {"id": "Logistics (Orange).Online", "type": 1}, {"id": "Logistics (Orange).Tracking Goods", "type": 1}, {"id": "Logistics (Orange).Payment", "type": 1}, {"id": "Deliver (Blue).Delivery", "type": 1}, {"id": "Deliver (Blue).Retailer", "type": 1}, {"id": "Pack (Pink).Packaging", "type": 1}]}, {"id": "Deliver (Blue).Retailer", "name": "Retailer", "group": "Deliver (Blue)", "imports": [{"id": "Plant (Yellow).In Season Plants", "type": 1}, {"id": "Plant (Yellow).Acclimatisation", "type": 1}, {"id": "Logistics (Orange).Database", "type": 1}, {"id": "Logistics (Orange).Online", "type": 1}, {"id": "Logistics (Orange).Payment", "type": 1}, {"id": "Logistics (Orange).Stocktake", "type": 1}, {"id": "Deliver (Blue).Delivery", "type": 1}, {"id": "Deliver (Blue).Consumer", "type": 1}, {"id": "Pack (Pink).Trolleys", "type": 1}]}, {"id": "Deliver (Blue).Driver", "name": "Driver", "group": "Deliver (Blue)", "imports": [{"id": "Legal (Red).Legislation", "type": 1}, {"id": "Legal (Red).Border Control", "type": 1}, {"id": "Legal (Red).Quarantine", "type": 1}, {"id": "Legal (Red).Insurance", "type": 1}, {"id": "Legal (Red).Onboarding", "type": 1}, {"id": "Plant (Yellow).Deciduous", "type": 1}, {"id": "Logistics (Orange).Database", "type": 1}, {"id": "Logistics (Orange).Tracking Goods", "type": 1}, {"id": "Deliver (Blue).Delivery", "type": 1}, {"id": "Deliver (Blue).Delivery Staff", "type": 1}, {"id": "Deliver (Blue).Transportation Company", "type": 1}, {"id": "Deliver (Blue).Handling Equipment", "type": 1}, {"id": "Pack (Pink).Warehouse Workers", "type": 1}]}, {"id": "Deliver (Blue).Delivery Staff", "name": "Delivery Staff", "group": "Deliver (Blue)", "imports": [{"id": "Legal (Red).Legislation", "type": 1}, {"id": "Legal (Red).Insurance", "type": 1}, {"id": "Legal (Red).Onboarding", "type": 1}, {"id": "Logistics (Orange).Database", "type": 1}, {"id": "Logistics (Orange).Tracking Goods", "type": 1}, {"id": "Deliver (Blue).Delivery", "type": 1}, {"id": "Deliver (Blue).Driver", "type": 1}, {"id": "Deliver (Blue).Transportation Company", "type": 1}, {"id": "Deliver (Blue).Handling Equipment", "type": 1}, {"id": "Pack (Pink).Warehouse Workers", "type": 1}]}, {"id": "Deliver (Blue).Transportation Company", "name": "Transportation Company", "group": "Deliver (Blue)", "imports": [{"id": "Legal (Red).Legislation", "type": 1}, {"id": "Legal (Red).Insurance", "type": 1}, {"id": "Legal (Red).Onboarding", "type": 1}, {"id": "Logistics (Orange).Database", "type": 1}, {"id": "Logistics (Orange).Tracking Goods", "type": 1}, {"id": "Logistics (Orange).Quotes", "type": 1}, {"id": "Logistics (Orange).Payment", "type": 1}, {"id": "Deliver (Blue).Delivery", "type": 1}, {"id": "Deliver (Blue).Driver", "type": 1}, {"id": "Deliver (Blue).Delivery Staff", "type": 1}, {"id": "Deliver (Blue).Handling Equipment", "type": 1}, {"id": "Pack (Pink).Trolleys", "type": 1}, {"id": "Pack (Pink).Supplier", "type": 1}]}, {"id": "Deliver (Blue).Handling Equipment", "name": "Handling Equipment", "group": "Deliver (Blue)", "imports": [{"id": "Legal (Red).Insurance", "type": 1}, {"id": "Plant (Yellow).Repotting", "type": 1}, {"id": "Deliver (Blue).Delivery", "type": 1}, {"id": "Deliver (Blue).Driver", "type": 1}, {"id": "Deliver (Blue).Delivery Staff", "type": 1}, {"id": "Deliver (Blue).Transportation Company", "type": 1}, {"id": "Pack (Pink).Packer", "type": 1}, {"id": "Pack (Pink).Packaging", "type": 1}, {"id": "Pack (Pink).Warehouse Workers", "type": 1}]}, {"id": "Pack (Pink).Packer", "name": "Packer", "group": "Pack (Pink)", "imports": [{"id": "Plant (Yellow).Repotting", "type": 1}, {"id": "Logistics (Orange).Waste", "type": 1}, {"id": "Logistics (Orange).Recycling", "type": 1}, {"id": "Logistics (Orange).Stocktake", "type": 1}, {"id": "Deliver (Blue).Handling Equipment", "type": 1}, {"id": "Pack (Pink).Packaging", "type": 1}, {"id": "Pack (Pink).Trolleys", "type": 1}, {"id": "Pack (Pink).Packaging Distributor", "type": 1}, {"id": "Pack (Pink).Warehouse Workers", "type": 1}]}, {"id": "Pack (Pink).Packaging", "name": "Packaging", "group": "Pack (Pink)", "imports": [{"id": "Legal (Red).Legislation", "type": 1}, {"id": "Legal (Red).Border Control", "type": 1}, {"id": "Legal (Red).Quarantine", "type": 1}, {"id": "Logistics (Orange).Tracking Goods", "type": 1}, {"id": "Logistics (Orange).Waste", "type": 1}, {"id": "Logistics (Orange).Recycling", "type": 1}, {"id": "Deliver (Blue).Delivery", "type": 1}, {"id": "Deliver (Blue).Consumer", "type": 1}, {"id": "Deliver (Blue).Handling Equipment", "type": 1}, {"id": "Pack (Pink).Packer", "type": 1}, {"id": "Pack (Pink).Trolleys", "type": 1}, {"id": "Pack (Pink).Manufacturer", "type": 1}, {"id": "Pack (Pink).Supplier", "type": 1}, {"id": "Pack (Pink).Packaging Distributor", "type": 1}, {"id": "Pack (Pink).Warehouse Workers", "type": 1}]}, {"id": "Pack (Pink).Trolleys", "name": "Trolleys", "group": "Pack (Pink)", "imports": [{"id": "Legal (Red).Insurance", "type": 1}, {"id": "Plant (Yellow).Deciduous", "type": 1}, {"id": "Logistics (Orange).Stocktake", "type": 1}, {"id": "Deliver (Blue).Delivery", "type": 1}, {"id": "Deliver (Blue).Retailer", "type": 1}, {"id": "Deliver (Blue).Transportation Company", "type": 1}, {"id": "Pack (Pink).Packer", "type": 1}, {"id": "Pack (Pink).Packaging", "type": 1}, {"id": "Pack (Pink).Manufacturer", "type": 1}, {"id": "Pack (Pink).Warehouse Workers", "type": 1}]}, {"id": "Pack (Pink).Manufacturer", "name": "Manufacturer", "group": "Pack (Pink)", "imports": [{"id": "Plant (Yellow).In Season Plants", "type": 1}, {"id": "Logistics (Orange).Stocktake", "type": 1}, {"id": "Pack (Pink).Packaging", "type": 1}, {"id": "Pack (Pink).Trolleys", "type": 1}, {"id": "Pack (Pink).Supplier", "type": 1}, {"id": "Pack (Pink).Warehouse Workers", "type": 1}]}, {"id": "Pack (Pink).Supplier", "name": "Supplier", "group": "Pack (Pink)", "imports": [{"id": "Legal (Red).Onboarding", "type": 1}, {"id": "Plant (Yellow).Rootstock", "type": 1}, {"id": "Logistics (Orange).Database", "type": 1}, {"id": "Logistics (Orange).Quotes", "type": 1}, {"id": "Logistics (Orange).Payment", "type": 1}, {"id": "Logistics (Orange).Stocktake", "type": 1}, {"id": "Deliver (Blue).Transportation Company", "type": 1}, {"id": "Pack (Pink).Packaging", "type": 1}, {"id": "Pack (Pink).Manufacturer", "type": 1}, {"id": "Pack (Pink).Packaging Distributor", "type": 1}]}, {"id": "Pack (Pink).Packaging Distributor", "name": "Packaging Distributor", "group": "Pack (Pink)", "imports": [{"id": "Legal (Red).Legislation", "type": 1}, {"id": "Logistics (Orange).Quotes", "type": 1}, {"id": "Logistics (Orange).Waste", "type": 1}, {"id": "Logistics (Orange).Recycling", "type": 1}, {"id": "Pack (Pink).Packer", "type": 1}, {"id": "Pack (Pink).Packaging", "type": 1}, {"id": "Pack (Pink).Supplier", "type": 1}, {"id": "Pack (Pink).Warehouse Workers", "type": 1}]}, {"id": "Pack (Pink).Warehouse Workers", "name": "Warehouse Workers", "group": "Pack (Pink)", "imports": [{"id": "Legal (Red).Legislation", "type": 1}, {"id": "Legal (Red).Quarantine", "type": 1}, {"id": "Legal (Red).Insurance", "type": 1}, {"id": "Legal (Red).Onboarding", "type": 1}, {"id": "Logistics (Orange).Database", "type": 1}, {"id": "Logistics (Orange).Tracking Goods", "type": 1}, {"id": "Logistics (Orange).Stocktake", "type": 1}, {"id": "Deliver (Blue).Driver", "type": 1}, {"id": "Deliver (Blue).Delivery Staff", "type": 1}, {"id": "Deliver (Blue).Handling Equipment", "type": 1}, {"id": "Pack (Pink).Packer", "type": 1}, {"id": "Pack (Pink).Packaging", "type": 1}, {"id": "Pack (Pink).Trolleys", "type": 1}, {"id": "Pack (Pink).Manufacturer", "type": 1}, {"id": "Pack (Pink).Packaging Distributor", "type": 1}]}];
     let currentColors = {"Legal (Red)": "#E63946", "Plant (Yellow)": "#E9C46A", "Logistics (Orange)": "#F4A261", "Deliver (Blue)": "#83C5BE", "Pack (Pink)": "#B5838D"};
     let namesList = ["Legislation", "Border Control", "Quarantine", "Insurance", "Onboarding", "Rootstock", "Grafting", "Deciduous", "Germination", "Irrigation", "Fertilising", "Repotting", "In Season Plants", "Biotech", "Acclimatisation", "Database", "Online", "Tracking Goods", "Quotes", "Payment", "Waste", "Recycling", "Stocktake", "Delivery", "Consumer", "Retailer", "Driver", "Delivery Staff", "Transportation Company", "Handling Equipment", "Packer", "Packaging", "Trolleys", "Manufacturer", "Supplier", "Packaging Distributor", "Warehouse Workers"];
+    
     const width = 1200, height = 1000;
     
-    let isEditMode = false, lineStyle = "gradient", tension = 0.45;
-    let nodeRadius = 5, nodeSpacing = 1, groupSpacing = 2, ringScale = 1.0, labelOffset = 10;
+    let isEditMode = false;
+    let routingStyle = "bundle", tension = 0.45, hubDepth = 0.50, ringScale = 1.0;
+    let nodeRadius = 5, nodeSpacing = 1, groupSpacing = 2;
     let editingNodeId = null, updateLayoutFn = null;
 
     const cleanId = str => str.replace(/[^a-zA-Z0-9]/g, '');
@@ -150,10 +158,9 @@
     // --- Build Sidebar ---
     function buildSidebar() {
         const controlsDiv = document.getElementById("color-controls");
-        const addNodeSelect = document.getElementById("new-node-category");
         const modalSelect = document.getElementById("modal-node-group");
         
-        controlsDiv.innerHTML = ""; addNodeSelect.innerHTML = ""; modalSelect.innerHTML = "";
+        controlsDiv.innerHTML = ""; modalSelect.innerHTML = "";
 
         Object.keys(currentColors).forEach(groupName => {
             const row = document.createElement("div"); row.className = "color-row";
@@ -164,7 +171,6 @@
             colorInput.addEventListener("input", (e) => { currentColors[groupName] = e.target.value; drawChart(); });
             
             row.appendChild(nameInput); row.appendChild(colorInput); controlsDiv.appendChild(row);
-            addNodeSelect.appendChild(new Option(groupName, groupName));
             modalSelect.appendChild(new Option(groupName, groupName));
         });
     }
@@ -178,13 +184,18 @@
     }
 
     // --- Sliders ---
+    document.getElementById("routing-style-selector").onchange = function() { routingStyle = this.value; updateLayoutFn(); };
+    document.getElementById("hub-depth-slider").oninput = function() { hubDepth = +this.value; document.getElementById("hub-depth-val").innerText = hubDepth.toFixed(2); updateLayoutFn(); };
     document.getElementById("tension-slider").oninput = function() { tension = +this.value; document.getElementById("tension-val").innerText = tension.toFixed(2); updateLayoutFn(); };
     document.getElementById("ring-size-slider").oninput = function() { ringScale = +this.value; document.getElementById("ring-size-val").innerText = ringScale.toFixed(2) + "x"; updateLayoutFn(); };
+    
     document.getElementById("node-size-slider").oninput = function() { nodeRadius = +this.value; document.getElementById("node-size-val").innerText = nodeRadius.toFixed(1); updateLayoutFn(); };
     document.getElementById("node-space-slider").oninput = function() { nodeSpacing = +this.value; document.getElementById("node-space-val").innerText = nodeSpacing.toFixed(1); updateLayoutFn(); };
     document.getElementById("group-space-slider").oninput = function() { groupSpacing = +this.value; document.getElementById("group-space-val").innerText = groupSpacing.toFixed(1); updateLayoutFn(); };
+    
     document.getElementById("thickness-slider").oninput = function() { document.documentElement.style.setProperty('--link-width', this.value + 'px'); document.getElementById("thickness-val").innerText = this.value + "px"; };
     document.getElementById("opacity-slider").oninput = function() { document.documentElement.style.setProperty('--link-opacity', this.value); document.getElementById("opacity-val").innerText = parseFloat(this.value).toFixed(2); };
+    let lineStyle = "gradient";
     document.getElementById("line-style-selector").onchange = function() { lineStyle = this.value; drawChart(); };
 
     function setMode(mode) {
@@ -229,6 +240,11 @@
         const cluster = d3.cluster().size([2 * Math.PI, dynamicRadius]).separation((a,b) => a.parent === b.parent ? nodeSpacing : groupSpacing);
         cluster(root);
         
+        // --- HIGHWAY MATH: HUB CONVERGENCE ---
+        root.each(d => {
+            if (d.depth === 1) d.y = dynamicRadius * hubDepth;
+        });
+
         const svg = d3.select("#chart").append("svg").attr("width", width).attr("height", height);
         const g = svg.append("g").attr("transform", `translate(${width/2},${height/2})`);
         const nodeById = new Map(root.leaves().map(d => [d.id, d]));
@@ -243,7 +259,12 @@
         });
 
         const defs = svg.append("defs");
-        const line = d3.lineRadial().curve(d3.curveBundle.beta(tension)).radius(d => d.y).angle(d => d.x);
+        
+        // Set Curve Generator based on dropdown
+        let curveGen = d3.curveBundle.beta(tension);
+        if (routingStyle === "basis") curveGen = d3.curveBasis;
+        if (routingStyle === "linear") curveGen = d3.curveLinear;
+        const line = d3.lineRadial().curve(curveGen).radius(d => d.y).angle(d => d.x);
 
         const linkElements = g.append("g").selectAll("path").data(links).join("path").attr("class", "link").attr("d", d => line(d))
             .style("stroke", d => {
@@ -272,7 +293,17 @@
         updateLayoutFn = () => {
             dynamicRadius = (Math.min(width, height)/2 - 250) * ringScale;
             cluster.separation((a,b) => a.parent === b.parent ? nodeSpacing : groupSpacing).size([2*Math.PI, dynamicRadius])(root);
-            line.curve(d3.curveBundle.beta(tension));
+            
+            // --- HIGHWAY MATH: Update Hub Convergence ---
+            root.each(d => {
+                if (d.depth === 1) d.y = dynamicRadius * hubDepth;
+            });
+
+            let curveGenUpdate = d3.curveBundle.beta(tension);
+            if (routingStyle === "basis") curveGenUpdate = d3.curveBasis;
+            if (routingStyle === "linear") curveGenUpdate = d3.curveLinear;
+            line.curve(curveGenUpdate);
+
             linkElements.attr("d", d => line(d));
             node.attr("transform", d => `rotate(${d.x * 180 / Math.PI - 90}) translate(${d.y},0)`);
             node.selectAll("circle").attr("r", nodeRadius);
@@ -302,28 +333,5 @@
             } }));
     }
     drawChart(); buildSidebar();
-
-    function exportCSV() {
-        let csv = "Node," + namesList.join(",") + "\n";
-        namesList.forEach(s => {
-            let r = [s], sn = nodesData.find(n => n.name === s);
-            namesList.forEach(t => { if(s===t) { r.push(0); return; } let tn = nodesData.find(n => n.name === t), imp = sn ? sn.imports.find(i => i.id === tn.id) : null; r.push(imp ? imp.type : 0); });
-            csv += r.join(",") + "\n";
-        });
-        const b = new Blob([csv], {type:'text/csv'}), u = URL.createObjectURL(b), l = document.createElement("a");
-        l.href = u; l.download = "system_matrix_edited.csv"; l.click();
-    }
-    function getSVG() {
-        const svg = document.querySelector('svg');
-        const s = new XMLSerializer().serializeToString(svg);
-        return 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(s)));
-    }
-    function exportSVG() { const l = document.createElement("a"); l.href = getSVG(); l.download = "system_map.svg"; l.click(); }
-    function exportPNG() {
-        const c = document.createElement("canvas"); c.width = width; c.height = height;
-        const ctx = c.getContext("2d"), img = new Image();
-        img.onload = () => { ctx.fillStyle = "#414142"; ctx.fillRect(0,0,width,height); ctx.drawImage(img,0,0); const l = document.createElement("a"); l.href = c.toDataURL(); l.download = "system_map.png"; l.click(); };
-        img.src = getSVG();
-    }
 </script>
 </body></html>
