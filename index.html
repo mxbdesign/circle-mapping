@@ -52,13 +52,13 @@
         .drawing-selector { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
         .drawing-selector label { background: #111; padding: 8px; border-radius: 4px; text-align: center; border: 1px solid #333; cursor: pointer; display: block; font-size: 9px; }
         .drawing-selector input { display: none; }
-        .drawing-selector input:checked + span { color: var(--danger); }
+        .drawing-selector input:checked + span { color: var(--danger); font-weight: bold; }
 
         /* Main Canvas */
         #main-content { flex-grow: 1; position: relative; background: var(--canvas-bg); display: flex; justify-content: center; align-items: center; }
         .link { fill: none !important; transition: stroke-opacity 0.2s; mix-blend-mode: screen; pointer-events: none; }
         .link.edit-mode { pointer-events: all; cursor: pointer; }
-        .node text { pointer-events: none; text-shadow: 0 2px 4px rgba(0,0,0,0.5); }
+        .node text { pointer-events: none; text-shadow: 0 2px 4px rgba(0,0,0,0.5); font-weight: 600; }
         .node circle { cursor: pointer; transition: r 0.2s; }
 
         /* Modals */
@@ -69,6 +69,7 @@
         .modal ul { font-size: 12px; padding-left: 20px; color: #aaa; }
 
         .temp-line { stroke: var(--danger); stroke-width: 2px; stroke-dasharray: 4,4; fill: none; }
+        .empty-prompt { color: #666; font-style: italic; text-align: center; }
     </style>
 </head>
 <body>
@@ -76,7 +77,7 @@
     <div id="intro-modal" class="modal-overlay" style="display: flex;">
         <div class="modal">
             <h3>🚀 Welcome to System Builder</h3>
-            <p>Design complex circular connection maps for logistics, biology, or infrastructure.</p>
+            <p><strong>First Step:</strong> You must create at least one <strong>Group</strong> in the sidebar before adding nodes.</p>
             <ul>
                 <li><strong>View Mode:</strong> Hover on nodes to isolate connections.</li>
                 <li><strong>Edit Mode:</strong> <u>Drag</u> between nodes to create links.</li>
@@ -109,7 +110,7 @@
         </div>
 
         <div id="edit-tools" style="display: none;">
-            <h2>Link Tool</h2>
+            <h2>Drawing Mode</h2>
             <div class="drawing-selector">
                 <label><input type="radio" name="draw-type" value="1" checked><span>Solid</span></label>
                 <label><input type="radio" name="draw-type" value="2"><span>Dashed</span></label>
@@ -130,26 +131,50 @@
             <input type="range" id="tension-slider" min="0" max="1" step="0.01" value="0.45">
         </div>
 
-        <h2>Canvas Style</h2>
+        <h2>Primary Link Style</h2>
         <div class="control-group">
-            <label>Background Color</label>
-            <input type="color" id="canvas-color" value="#414142" style="width:100%; border:none; height:30px; cursor:pointer;">
-            <label style="margin-top:10px;"><input type="checkbox" id="transparent-check"> Export with Transparency</label>
+            <label>Thickness <span class="val" id="val-w1">1.5px</span></label>
+            <input type="range" id="slider-w1" min="0.1" max="10" step="0.1" value="1.5">
+            <label style="margin-top:8px;">Opacity <span class="val" id="val-o1">0.50</span></label>
+            <input type="range" id="slider-o1" min="0.01" max="1" step="0.01" value="0.50">
         </div>
 
-        <h2>Node Styles</h2>
+        <h2>Secondary Link Style</h2>
+        <div class="control-group">
+            <label>Thickness <span class="val" id="val-w2">1.2px</span></label>
+            <input type="range" id="slider-w2" min="0.1" max="10" step="0.1" value="1.2">
+            <label style="margin-top:8px;">Opacity <span class="val" id="val-o2">0.30</span></label>
+            <input type="range" id="slider-o2" min="0.01" max="1" step="0.01" value="0.30">
+        </div>
+
+        <h2>Tertiary Link Style</h2>
+        <div class="control-group">
+            <label>Thickness <span class="val" id="val-w3">0.8px</span></label>
+            <input type="range" id="slider-w3" min="0.1" max="10" step="0.1" value="0.8">
+            <label style="margin-top:8px;">Opacity <span class="val" id="val-o3">0.20</span></label>
+            <input type="range" id="slider-o3" min="0.01" max="1" step="0.01" value="0.20">
+        </div>
+
+        <h2>Canvas & Export</h2>
+        <div class="control-group">
+            <label>Canvas Color</label>
+            <input type="color" id="canvas-color" value="#414142" style="width:100%; border:none; height:30px; cursor:pointer;">
+            <label style="margin-top:10px;"><input type="checkbox" id="transparent-check"> Export Transparent</label>
+        </div>
+
+        <h2>Node Rules</h2>
         <div class="control-group">
             <label>Base Size <span class="val" id="bsize-val">5.0</span></label>
             <input type="range" id="bsize-slider" min="2" max="15" step="0.5" value="5">
-            <label style="margin-top:10px;">Growth Influence <span class="val" id="grow-val">1.0</span></label>
+            <label style="margin-top:10px;">Scaling Factor <span class="val" id="grow-val">1.0</span></label>
             <input type="range" id="grow-slider" min="0" max="5" step="0.1" value="1">
-            <label style="margin-top:10px;">Margin Gap <span class="val" id="marg-val">10px</span></label>
+            <label style="margin-top:10px;">Minimum Margin <span class="val" id="marg-val">10px</span></label>
             <input type="range" id="marg-slider" min="0" max="50" step="1" value="10">
         </div>
 
         <h2>Add Node</h2>
         <div class="control-group">
-            <input type="text" id="new-node-name" class="text-input" placeholder="Name...">
+            <input type="text" id="new-node-name" class="text-input" placeholder="Node Name...">
             <select id="new-node-group"></select>
             <button class="btn active btn-action" onclick="addNewNode()">➕ Add Node</button>
         </div>
@@ -157,7 +182,7 @@
         <h2>Add Group</h2>
         <div class="control-group">
             <input type="text" id="new-group-name" class="text-input" placeholder="Group Name...">
-            <input type="color" id="new-group-color" value="#ffffff" style="width:100%; border:none; height:20px; cursor:pointer; margin:5px 0;">
+            <input type="color" id="new-group-color" value="#ffffff" style="width:100%; border:none; height:25px; cursor:pointer; margin:5px 0;">
             <button class="btn active btn-action" style="background:#555;" onclick="addNewGroup()">✨ Create Group</button>
         </div>
 
@@ -178,14 +203,8 @@
 
     <script>
         // --- Data State ---
-        let nodesData = []; // Pure Empty Start
-        let groups = {
-            "Legal": "#E63946",
-            "Plant": "#E9C46A",
-            "Logistic": "#F4A261",
-            "Support": "#83C5BE",
-            "Other": "#999999"
-        };
+        let nodesData = []; 
+        let groups = {}; // Starts completely empty
         
         let isEditMode = false, isHeatmap = false, isScaling = false;
         let ringScale = 1.0, hubDepth = 0.5, tension = 0.45;
@@ -195,7 +214,7 @@
         const width = 1200, height = 1000;
         const cleanId = str => str.replace(/[^a-zA-Z0-9]/g, '');
 
-        // --- Logic Engine ---
+        // --- Core Logic ---
 
         function setMode(mode) {
             isEditMode = (mode === 'edit');
@@ -222,10 +241,11 @@
         function addNewGroup() {
             const name = document.getElementById('new-group-name').value.trim();
             const color = document.getElementById('new-group-color').value;
-            if(!name || groups[name]) return alert("Invalid Group");
+            if(!name || groups[name]) return alert("Please provide a unique group name.");
             groups[name] = color;
             document.getElementById('new-group-name').value = "";
             updateGroupUI();
+            drawChart();
         }
 
         function updateGroupUI() {
@@ -244,7 +264,7 @@
                 row.innerHTML = `
                     <div style="display:flex; align-items:center; gap:8px;">
                         <input type="color" value="${groups[g]}" oninput="groups['${g}']=this.value; drawChart();" style="width:20px; border:none; background:none; cursor:pointer;">
-                        <input type="text" value="${g}" class="text-input" style="margin:0; flex:1;" onchange="renameGroup('${g}', this.value)">
+                        <input type="text" value="${g}" class="text-input" style="margin:0; flex:1; border:none; background:transparent;" onchange="renameGroup('${g}', this.value)">
                         <button onclick="deleteGroup('${g}')" style="background:none; border:none; color:white; cursor:pointer;">🗑️</button>
                     </div>
                 `;
@@ -253,14 +273,17 @@
         }
 
         function deleteGroup(g) {
-            if(Object.keys(groups).length <= 1) return alert("Must keep one group");
-            if(confirm("Nodes in this group will move to 'Other'. Proceed?")) {
+            if(confirm(`Delete group "${g}"? Nodes will move to another group if available.`)) {
                 let fallback = Object.keys(groups).find(key => key !== g);
-                nodesData.forEach(n => {
-                    if(n.group === g) {
-                        n.group = fallback; n.id = `${fallback}.${n.name}`;
-                    }
-                });
+                if (!fallback) {
+                    nodesData = []; // Wipe everything if last group is gone
+                } else {
+                    nodesData.forEach(n => {
+                        if(n.group === g) {
+                            n.group = fallback; n.id = `${fallback}.${n.name}`;
+                        }
+                    });
+                }
                 delete groups[g];
                 updateGroupUI();
                 drawChart();
@@ -279,21 +302,25 @@
         }
 
         function addNewNode() {
+            if (Object.keys(groups).length === 0) return alert("Create a Group first!");
             const name = document.getElementById('new-node-name').value.trim();
             const group = document.getElementById('new-node-group').value;
-            if(!name || nodesData.find(n => n.name === name)) return alert("Node name exists or invalid");
+            if(!name || nodesData.find(n => n.name === name)) return alert("Duplicate or empty node name.");
             nodesData.push({ id: `${group}.${name}`, name: name, group: group, imports: [] });
             document.getElementById('new-node-name').value = "";
             drawChart();
         }
 
-        function clearAll() { if(confirm("Start entirely from scratch?")) { nodesData = []; drawChart(); } }
+        function clearAll() { if(confirm("Permanently wipe all data?")) { nodesData = []; groups = {}; updateGroupUI(); drawChart(); } }
 
-        // --- Render Engine ---
+        // --- D3 Engine ---
 
         function drawChart() {
             d3.select("#chart").html("");
-            if(nodesData.length === 0) return d3.select("#chart").append("p").style("color", "#666").text("Add nodes to begin mapping...");
+            if(nodesData.length === 0) {
+                d3.select("#chart").append("div").attr("class", "empty-prompt").text("The canvas is empty. Add a group and nodes to begin.");
+                return;
+            }
 
             const table = [{id: "root", parentId: null}];
             Object.keys(groups).forEach(g => table.push({id: g, parentId: "root"}));
@@ -381,8 +408,8 @@
             // Interaction
             nodeElems.on("mouseover", function(e, d) {
                 if(isEditMode) return;
-                d3.selectAll(".node").style("opacity", 0.1);
-                d3.selectAll(".link").style("opacity", 0.05);
+                d3.selectAll(".node").style("opacity", 0.05);
+                d3.selectAll(".link").style("opacity", 0.02);
                 d3.select(this).style("opacity", 1);
                 const active = linkElems.filter(l => l.sourceNode.id === d.id || l.targetNode.id === d.id);
                 active.style("stroke-opacity", 1).style("mix-blend-mode", "normal").raise();
@@ -423,7 +450,7 @@
             );
         }
 
-        // --- Utility Functions ---
+        // --- UI Utils ---
 
         function openNodeModal(d) {
             editingNodeId = d.id;
@@ -438,12 +465,9 @@
             const target = nodesData.find(n => n.id === editingNodeId);
             const newName = document.getElementById('edit-node-name').value.trim();
             const newGroup = document.getElementById('edit-node-group').value;
-            
-            // Cascading ID update
             const oldId = target.id;
             const newId = `${newGroup}.${newName}`;
             target.name = newName; target.group = newGroup; target.id = newId;
-            
             nodesData.forEach(n => {
                 n.imports.forEach(imp => { if(imp.id === oldId) imp.id = newId; });
             });
@@ -456,14 +480,11 @@
             closeNodeModal(); drawChart();
         }
 
-        // --- Export Logic ---
-
         function getCleanSVG() {
             const svgClone = document.querySelector('svg').cloneNode(true);
             const style = getComputedStyle(document.documentElement);
             svgClone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
             
-            // Baking link styles
             svgClone.querySelectorAll('.link').forEach(l => {
                 const type = l.getAttribute('data-type') || 1;
                 l.setAttribute('fill', 'none');
@@ -472,7 +493,6 @@
                 if(type==2) l.setAttribute('stroke-dasharray', '8,5');
                 if(type==3) l.setAttribute('stroke-dasharray', '2,3');
                 
-                // Solve gradient
                 const gradUrl = l.style.stroke;
                 if(gradUrl.includes('url')) {
                     const id = gradUrl.split('"')[1].replace('#', '');
@@ -488,6 +508,7 @@
                 t.setAttribute('font-family', 'Arial, sans-serif');
                 t.setAttribute('fill', getComputedStyle(t).fill);
                 t.setAttribute('font-size', style.getPropertyValue('--node-font-size'));
+                t.setAttribute('font-weight', '600');
             });
 
             return new XMLSerializer().serializeToString(svgClone);
@@ -496,7 +517,7 @@
         function exportSVG() {
             const blob = new Blob([getCleanSVG()], {type: 'image/svg+xml;charset=utf-8'});
             const url = URL.createObjectURL(blob);
-            const link = document.createElement("a"); link.href = url; link.download = "system_map.svg"; link.click();
+            const link = document.createElement("a"); link.href = url; link.download = "map.svg"; link.click();
         }
 
         function exportPNG() {
@@ -511,7 +532,7 @@
                     ctx.fillRect(0,0,width,height);
                 }
                 ctx.drawImage(img, 0, 0);
-                const a = document.createElement("a"); a.href = canvas.toDataURL("image/png"); a.download = "system_map.png"; a.click();
+                const a = document.createElement("a"); a.href = canvas.toDataURL("image/png"); a.download = "map.png"; a.click();
             };
             img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(getCleanSVG())));
         }
@@ -542,15 +563,6 @@
         };
 
         // Sliders Listeners
-        const syncSlider = (id, target, valId, suffix="", redraw=false) => {
-            document.getElementById(id).oninput = function() {
-                if(suffix == "px") document.documentElement.style.setProperty(target, this.value + suffix);
-                document.getElementById(valId).innerText = this.value + (suffix === "px" ? "px" : suffix === "x" ? "x" : "");
-                window[valId.split('-')[0]] = +this.value; // Update global vars
-                if(redraw) drawChart();
-            };
-        };
-
         document.getElementById('ring-slider').oninput = function() { ringScale = +this.value; document.getElementById('ring-val').innerText = ringScale + 'x'; drawChart(); };
         document.getElementById('hub-slider').oninput = function() { hubDepth = +this.value; document.getElementById('hub-val').innerText = hubDepth.toFixed(2); drawChart(); };
         document.getElementById('tension-slider').oninput = function() { tension = +this.value; document.getElementById('tension-val').innerText = tension.toFixed(2); drawChart(); };
@@ -558,11 +570,11 @@
         document.getElementById('grow-slider').oninput = function() { scalingInfluence = +this.value; document.getElementById('grow-val').innerText = scalingInfluence.toFixed(1); drawChart(); };
         document.getElementById('marg-slider').oninput = function() { nodeMargin = +this.value; document.getElementById('marg-val').innerText = nodeMargin + 'px'; drawChart(); };
         
-        // Link Sliders
         const lSlid = (id, root, val) => {
             document.getElementById(id).oninput = function() {
-                document.documentElement.style.setProperty(root, this.value + (id.includes('thick') ? 'px' : ''));
-                document.getElementById(val).innerText = this.value + (id.includes('thick') ? 'px' : '');
+                const suffix = id.includes('slider-w') ? 'px' : '';
+                document.documentElement.style.setProperty(root, this.value + suffix);
+                document.getElementById(val).innerText = this.value + suffix;
             };
         };
         lSlid('slider-w1', '--link-width-1', 'val-w1'); lSlid('slider-o1', '--link-opacity-1', 'val-o1');
