@@ -6,11 +6,11 @@
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
-        :root { 
+        :root {
             --bg-main: #414142; --bg-sidebar: #1e1e1f; --panel-bg: #2d2d2e; --border-color: #3f3f40;
             --text-main: #f0f0f0; --text-muted: #aaaaaa; --accent: #2A9D8F; --danger: #E63946;
             --node-font-size: 13px; --node-font-weight: 600;
-            
+
             /* Hardcoded Default Settings matching Screenshot */
             --link-width-1: 3.8px; --link-opacity-1: 0.60;
             --link-width-2: 2.1px; --link-opacity-2: 0.35;
@@ -20,40 +20,52 @@
         #sidebar { width: 360px; background-color: var(--bg-sidebar); padding: 20px; box-shadow: 5px 0 15px rgba(0,0,0,0.3); overflow-y: auto; z-index: 100; border-right: 1px solid var(--border-color); }
         #sidebar::-webkit-scrollbar { width: 6px; }
         #sidebar::-webkit-scrollbar-thumb { background-color: #555; border-radius: 3px; }
-        
+
         /* HOVER CSS */
         .faded { opacity: 0.08 !important; }
         .link.highlighted { opacity: 1 !important; stroke-opacity: 1 !important; mix-blend-mode: normal !important; }
         .node.highlighted text { opacity: 1 !important; }
 
-        h2 { margin-top: 15px; font-size: 10px; color: var(--accent); text-transform: uppercase; letter-spacing: 2px; border-bottom: 1px solid var(--border-color); padding-bottom: 4px; }
+        h2 { margin-top: 15px; font-size: 10px; color: var(--accent); text-transform: uppercase; letter-spacing: 2px; border-bottom: 1px solid var(--border-color); padding-bottom: 4px; position: sticky; top: 0; z-index: 10; background-color: var(--bg-sidebar); overflow: hidden; }
+        h2::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            z-index: -1;
+            background-image: var(--header-bg-img, none);
+            background-size: cover;
+            background-position: center;
+            filter: invert(1) sepia(1) saturate(10000%) hue-rotate(345deg);
+            mix-blend-mode: multiply;
+            opacity: var(--header-bg-opacity, 0.5);
+        }
         .control-group { margin-bottom: 12px; padding: 10px; background-color: var(--panel-bg); border-radius: 8px; border: 1px solid var(--border-color); }
         .control-group label { display: flex; justify-content: space-between; font-size: 10px; color: var(--text-muted); font-weight: 700; margin-bottom: 5px; }
         input[type=range] { width: 100%; accent-color: var(--accent); cursor: pointer; }
         select, .text-input { width: 100%; padding: 7px; border-radius: 4px; border: 1px solid var(--border-color); background-color: var(--bg-main); color: var(--text-main); font-size: 11px; }
-        
+
         .mode-toggle { display: flex; gap: 10px; margin-bottom: 15px; }
         .mode-btn { flex: 1; padding: 12px; text-align: center; background: var(--panel-bg); color: var(--text-muted); font-weight: bold; border-radius: 6px; cursor: pointer; border: 1px solid var(--border-color); font-size: 12px; }
         .mode-btn.active { background: var(--accent); color: white; }
         .mode-btn.edit-active { background: var(--danger); color: white; animation: pulse 2s infinite; }
-        
+
         @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(230, 57, 70, 0.4); } 70% { box-shadow: 0 0 0 8px rgba(230, 57, 70, 0); } 100% { box-shadow: 0 0 0 0 rgba(230, 57, 70, 0); } }
         #edit-tools { display: none; margin-bottom: 15px; padding: 12px; background-color: rgba(230, 57, 70, 0.05); border-radius: 8px; border: 1px dashed var(--danger); }
         .drawing-selector { display: flex; flex-direction: column; gap: 5px; }
         .drawing-selector label { background: #222; padding: 6px; border-radius: 4px; cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 11px; }
-        
+
         #main-content { flex-grow: 1; display: flex; justify-content: center; align-items: center; position: relative; overflow: hidden; }
         .node text { font-size: var(--node-font-size); font-weight: var(--node-font-weight); user-select: none; text-shadow: 0px 2px 4px rgba(0,0,0,0.8); transition: opacity 0.2s; }
         .link { fill: none !important; transition: stroke-opacity 0.2s, stroke-width 0.2s; mix-blend-mode: screen; pointer-events: none; }
         .link.edit-mode { pointer-events: all; cursor: pointer; }
-        
+
         #node-modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 999; display: none; }
         #node-modal { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: var(--bg-sidebar); padding: 25px; border-radius: 12px; z-index: 1000; display: none; width: 340px; border: 1px solid var(--accent); box-shadow: 0 20px 50px rgba(0,0,0,0.8); }
         .temp-drag-line { fill: none; stroke: var(--danger); stroke-width: 2px; pointer-events: none; stroke-dasharray: 4,4; }
         .color-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; padding: 4px 8px; background-color: var(--panel-bg); border-radius: 6px; border: 1px solid var(--border-color); }
         .group-name-edit { border: none; background: transparent; font-size: 11px; color: var(--text-main); font-weight: 600; width: 100%; outline: none; }
         .del-group-btn { background: none; border: none; color: #666; cursor: pointer; font-size: 14px; transition: 0.2s; padding: 0 4px; }
-        
+
         .action-btn { width: 100%; font-weight: bold; padding: 10px; border-radius: 6px; border: none; margin-top: 8px; cursor: pointer; transition: 0.2s; }
         .action-btn:hover { filter: brightness(1.2); }
     </style>
@@ -109,7 +121,7 @@
         <label>Primary Thick <span id="val-w1">3.8px</span></label><input type="range" id="slider-w1" min="0.1" max="10" step="0.1" value="3.8">
         <label style="margin-top:8px;">Secondary Thick <span id="val-w2">2.1px</span></label><input type="range" id="slider-w2" min="0.1" max="10" step="0.1" value="2.1">
         <label style="margin-top:8px;">Tertiary Thick <span id="val-w3">0.8px</span></label><input type="range" id="slider-w3" min="0.1" max="10" step="0.1" value="0.8">
-        
+
         <label style="margin-top:8px; color:var(--accent);">Opacities</label>
         <div style="display:flex; gap:5px;">
             <input type="range" id="slider-o1" min="0.01" max="1" step="0.01" value="0.60" title="Primary Opacity">
@@ -125,11 +137,19 @@
         <label style="margin-top:10px;">Margin <span id="marg-val">10px</span></label><input type="range" id="marg-slider" min="0" max="50" step="1" value="10">
     </div>
 
+    <h2>Header Decoration</h2>
+    <div class="control-group">
+        <label>Image R2 Endpoint</label>
+        <input type="text" id="header-bg-url" class="text-input" placeholder="https://pub-...r2.dev/img.png" style="margin-bottom:10px;" oninput="updateHeaderConfig()">
+        <label>Opacity <span id="header-op-val">0.5</span></label>
+        <input type="range" id="header-opacity-slider" min="0" max="1" step="0.01" value="0.5" oninput="updateHeaderConfig()">
+    </div>
+
     <h2>Canvas & Export Quality</h2>
     <div class="control-group">
         <label>Background Color</label>
         <input type="color" id="canvas-color" value="#414142" style="width:100%; border:none; height:30px; cursor:pointer;" oninput="document.documentElement.style.setProperty('--bg-main', this.value);">
-        
+
         <label style="margin-top:10px;">Export Resolution</label>
         <select id="export-scale" style="margin-bottom: 10px;">
             <option value="1">1x (1600 x 1200)</option>
@@ -137,7 +157,7 @@
             <option value="3" selected>3x (4800 x 3600) - Ultra HD</option>
             <option value="4">4x (6400 x 4800) - Extreme</option>
         </select>
-        
+
         <label><input type="checkbox" id="transparent-check" checked> Render Transparent BG</label>
     </div>
 
@@ -175,18 +195,37 @@
     let nodesData = [{"id": "Biological State.Dormancy Depth", "name": "Dormancy Depth", "group": "Biological State", "imports": [{"id": "Regulatory & Data.Plant Condition Data", "type": 1}, {"id": "Environmental Stressors.Light", "type": 1}]}, {"id": "Biological State.Hydration Reserves", "name": "Hydration Reserves", "group": "Biological State", "imports": [{"id": "Environmental Stressors.Thermal Fluctuations", "type": 1}, {"id": "Environmental Stressors.Ethylene Accumulation", "type": 2}, {"id": "Regulatory & Data.Quarantine Protocols", "type": 2}, {"id": "Regulatory & Data.Plant Condition Data", "type": 1}, {"id": "Logistics & Infrastructure.Packer", "type": 1}, {"id": "Logistics & Infrastructure.Packaging", "type": 1}, {"id": "Logistics & Infrastructure.Logistical Handler", "type": 1}]}, {"id": "Biological State.Respiration Rate", "name": "Respiration Rate", "group": "Biological State", "imports": [{"id": "Environmental Stressors.Thermal Fluctuations", "type": 1}, {"id": "Environmental Stressors.Ethylene Accumulation", "type": 1}, {"id": "Environmental Stressors.Airflow", "type": 1}]}, {"id": "Biological State.Structural Integrity", "name": "Structural Integrity", "group": "Biological State", "imports": [{"id": "Environmental Stressors.Mechanical Shock", "type": 1}, {"id": "Environmental Stressors.Vibration", "type": 1}, {"id": "Logistics & Infrastructure.Packaging", "type": 1}, {"id": "Logistics & Infrastructure.Logistical Handler", "type": 1}, {"id": "Stakeholders.Driver", "type": 1}, {"id": "Stakeholders.Transportation Company", "type": 1}]}, {"id": "Environmental Stressors.Thermal Fluctuations", "name": "Thermal Fluctuations", "group": "Environmental Stressors", "imports": [{"id": "Biological State.Hydration Reserves", "type": 1}, {"id": "Biological State.Respiration Rate", "type": 1}, {"id": "Regulatory & Data.Border Control", "type": 2}, {"id": "Logistics & Infrastructure.Packaging", "type": 1}, {"id": "Logistics & Infrastructure.Storage", "type": 1}]}, {"id": "Environmental Stressors.Ethylene Accumulation", "name": "Ethylene Accumulation", "group": "Environmental Stressors", "imports": [{"id": "Biological State.Hydration Reserves", "type": 2}, {"id": "Biological State.Respiration Rate", "type": 1}, {"id": "Environmental Stressors.Airflow", "type": 1}]}, {"id": "Environmental Stressors.Mechanical Shock", "name": "Mechanical Shock", "group": "Environmental Stressors", "imports": [{"id": "Biological State.Structural Integrity", "type": 1}, {"id": "Environmental Stressors.Vibration", "type": 1}, {"id": "Logistics & Infrastructure.Logistical Handler", "type": 2}, {"id": "Stakeholders.Delivery", "type": 1}, {"id": "Stakeholders.Driver", "type": 1}, {"id": "Stakeholders.Handling Equipment", "type": 1}]}, {"id": "Environmental Stressors.Vibration", "name": "Vibration", "group": "Environmental Stressors", "imports": [{"id": "Biological State.Structural Integrity", "type": 1}, {"id": "Environmental Stressors.Mechanical Shock", "type": 1}, {"id": "Stakeholders.Handling Equipment", "type": 1}]}, {"id": "Regulatory & Data.Quarantine Protocols", "name": "Quarantine Protocols", "group": "Regulatory & Data", "imports": [{"id": "Biological State.Hydration Reserves", "type": 2}, {"id": "Regulatory & Data.Legislation", "type": 2}, {"id": "Stakeholders.Transportation Company", "type": 2}, {"id": "Logistics & Infrastructure.Storage", "type": 2}]}, {"id": "Regulatory & Data.Plant Condition Data", "name": "Plant Condition Data", "group": "Regulatory & Data", "imports": [{"id": "Biological State.Dormancy Depth", "type": 1}, {"id": "Biological State.Hydration Reserves", "type": 1}, {"id": "Logistics & Infrastructure.Database", "type": 1}, {"id": "Stakeholders.Consumer", "type": 1}, {"id": "Stakeholders.Delivery", "type": 1}, {"id": "Stakeholders.Transportation Company", "type": 1}]}, {"id": "Regulatory & Data.Legislation", "name": "Legislation", "group": "Regulatory & Data", "imports": [{"id": "Regulatory & Data.Quarantine Protocols", "type": 2}, {"id": "Regulatory & Data.Insurance", "type": 3}, {"id": "Logistics & Infrastructure.Packaging", "type": 2}, {"id": "Stakeholders.Retailer", "type": 2}, {"id": "Stakeholders.Transportation Company", "type": 2}]}, {"id": "Regulatory & Data.Insurance", "name": "Insurance", "group": "Regulatory & Data", "imports": [{"id": "Regulatory & Data.Legislation", "type": 3}, {"id": "Logistics & Infrastructure.Logistical Handler", "type": 2}, {"id": "Stakeholders.Delivery", "type": 2}, {"id": "Stakeholders.Retailer", "type": 2}, {"id": "Stakeholders.Transportation Company", "type": 2}]}, {"id": "Regulatory & Data.Chain of Custody", "name": "Chain of Custody", "group": "Regulatory & Data", "imports": [{"id": "Logistics & Infrastructure.Database", "type": 3}, {"id": "Stakeholders.Transportation Company", "type": 1}, {"id": "Stakeholders.Handling Equipment", "type": 1}, {"id": "Logistics & Infrastructure.Storage", "type": 1}]}, {"id": "Regulatory & Data.Border Control", "name": "Border Control", "group": "Regulatory & Data", "imports": [{"id": "Environmental Stressors.Thermal Fluctuations", "type": 2}, {"id": "Logistics & Infrastructure.Storage", "type": 1}]}, {"id": "Logistics & Infrastructure.Packer", "name": "Packer", "group": "Logistics & Infrastructure", "imports": [{"id": "Biological State.Hydration Reserves", "type": 1}, {"id": "Logistics & Infrastructure.Plant Upkeep Knowledge", "type": 2}]}, {"id": "Logistics & Infrastructure.Packaging", "name": "Packaging", "group": "Logistics & Infrastructure", "imports": [{"id": "Biological State.Hydration Reserves", "type": 1}, {"id": "Biological State.Structural Integrity", "type": 1}, {"id": "Environmental Stressors.Thermal Fluctuations", "type": 1}, {"id": "Regulatory & Data.Legislation", "type": 2}]}, {"id": "Logistics & Infrastructure.Logistical Handler", "name": "Logistical Handler", "group": "Logistics & Infrastructure", "imports": [{"id": "Biological State.Hydration Reserves", "type": 1}, {"id": "Biological State.Structural Integrity", "type": 1}, {"id": "Environmental Stressors.Mechanical Shock", "type": 2}, {"id": "Regulatory & Data.Insurance", "type": 2}]}, {"id": "Logistics & Infrastructure.Database", "name": "Database", "group": "Logistics & Infrastructure", "imports": [{"id": "Regulatory & Data.Plant Condition Data", "type": 1}, {"id": "Regulatory & Data.Chain of Custody", "type": 3}, {"id": "Stakeholders.Transportation Company", "type": 3}]}, {"id": "Stakeholders.Consumer", "name": "Consumer", "group": "Stakeholders", "imports": [{"id": "Regulatory & Data.Plant Condition Data", "type": 1}, {"id": "Stakeholders.Payment", "type": 3}]}, {"id": "Stakeholders.Delivery", "name": "Delivery", "group": "Stakeholders", "imports": [{"id": "Environmental Stressors.Mechanical Shock", "type": 1}, {"id": "Regulatory & Data.Plant Condition Data", "type": 1}, {"id": "Regulatory & Data.Insurance", "type": 2}]}, {"id": "Stakeholders.Driver", "name": "Driver", "group": "Stakeholders", "imports": [{"id": "Biological State.Structural Integrity", "type": 1}, {"id": "Environmental Stressors.Mechanical Shock", "type": 1}, {"id": "Logistics & Infrastructure.Plant Upkeep Knowledge", "type": 2}, {"id": "Stakeholders.Transport Equipment", "type": 1}]}, {"id": "Stakeholders.Payment", "name": "Payment", "group": "Stakeholders", "imports": [{"id": "Stakeholders.Consumer", "type": 3}]}, {"id": "Stakeholders.Retailer", "name": "Retailer", "group": "Stakeholders", "imports": [{"id": "Regulatory & Data.Legislation", "type": 2}, {"id": "Regulatory & Data.Insurance", "type": 2}, {"id": "Logistics & Infrastructure.Plant Upkeep Knowledge", "type": 2}]}, {"id": "Stakeholders.Transportation Company", "name": "Transportation Company", "group": "Stakeholders", "imports": [{"id": "Biological State.Structural Integrity", "type": 1}, {"id": "Regulatory & Data.Quarantine Protocols", "type": 2}, {"id": "Regulatory & Data.Plant Condition Data", "type": 1}, {"id": "Regulatory & Data.Legislation", "type": 2}, {"id": "Regulatory & Data.Insurance", "type": 2}, {"id": "Regulatory & Data.Chain of Custody", "type": 1}, {"id": "Logistics & Infrastructure.Database", "type": 3}, {"id": "Logistics & Infrastructure.Plant Upkeep Knowledge", "type": 2}]}, {"id": "Environmental Stressors.Airflow", "name": "Airflow", "group": "Environmental Stressors", "imports": [{"id": "Biological State.Respiration Rate", "type": 1}, {"id": "Environmental Stressors.Ethylene Accumulation", "type": 1}]}, {"id": "Environmental Stressors.Light", "name": "Light", "group": "Environmental Stressors", "imports": [{"id": "Biological State.Dormancy Depth", "type": 1}, {"id": "Logistics & Infrastructure.Storage", "type": 1}]}, {"id": "Logistics & Infrastructure.Plant Upkeep Knowledge", "name": "Plant Upkeep Knowledge", "group": "Logistics & Infrastructure", "imports": [{"id": "Logistics & Infrastructure.Packer", "type": 2}, {"id": "Stakeholders.Driver", "type": 2}, {"id": "Stakeholders.Retailer", "type": 2}, {"id": "Stakeholders.Transportation Company", "type": 2}]}, {"id": "Stakeholders.Transport Equipment", "name": "Transport Equipment", "group": "Stakeholders", "imports": [{"id": "Stakeholders.Driver", "type": 1}]}, {"id": "Stakeholders.Handling Equipment", "name": "Handling Equipment", "group": "Stakeholders", "imports": [{"id": "Environmental Stressors.Mechanical Shock", "type": 1}, {"id": "Environmental Stressors.Vibration", "type": 1}, {"id": "Regulatory & Data.Chain of Custody", "type": 1}]}, {"id": "Logistics & Infrastructure.Storage", "name": "Storage", "group": "Logistics & Infrastructure", "imports": [{"id": "Environmental Stressors.Thermal Fluctuations", "type": 1}, {"id": "Regulatory & Data.Quarantine Protocols", "type": 2}, {"id": "Regulatory & Data.Chain of Custody", "type": 1}, {"id": "Regulatory & Data.Border Control", "type": 1}, {"id": "Environmental Stressors.Light", "type": 1}]}];
     let currentColors = {"Biological State": "#cdff70", "Environmental Stressors": "#fed462", "Regulatory & Data": "#eb85ff", "Logistics & Infrastructure": "#8ab7ff", "Stakeholders": "#83c5be"};
     let namesList = ["Dormancy Depth", "Hydration Reserves", "Respiration Rate", "Structural Integrity", "Thermal Fluctuations", "Ethylene Accumulation", "Mechanical Shock", "Vibration", "Quarantine Protocols", "Plant Condition Data", "Legislation", "Insurance", "Chain of Custody", "Border Control", "Packer", "Packaging", "Logistical Handler", "Database", "Consumer", "Delivery", "Driver", "Payment", "Retailer", "Transportation Company", "Airflow", "Light", "Plant Upkeep Knowledge", "Transport Equipment", "Handling Equipment", "Storage"];
-    
-    const width = 1600, height = 1200; 
-    
+
+    const width = 1600, height = 1200;
+
     // Explicit JS Variables for Export Rendering
     let w1 = 3.8, o1 = 0.60;
     let w2 = 2.1, o2 = 0.35;
     let w3 = 0.8, o3 = 0.20;
-    
+
+    // JSON Config for Header Decoration
+    let jsonConfig = { headerBgUrl: "", headerOpacity: 0.5 };
+
+    function updateHeaderConfig() {
+        const url = document.getElementById("header-bg-url").value.trim();
+        const op = document.getElementById("header-opacity-slider").value;
+        jsonConfig.headerBgUrl = url;
+        jsonConfig.headerOpacity = parseFloat(op);
+
+        document.getElementById("header-op-val").innerText = jsonConfig.headerOpacity.toFixed(2);
+
+        if (url) {
+            document.documentElement.style.setProperty('--header-bg-img', `url('${url}')`);
+        } else {
+            document.documentElement.style.setProperty('--header-bg-img', 'none');
+        }
+        document.documentElement.style.setProperty('--header-bg-opacity', jsonConfig.headerOpacity);
+    }
+
     // Default Modes perfectly matching your screenshot requirements
     let isEditMode = false, isHeatmap = false, isSizeHeatmap = true;
     let tension = 0.45, nodeRadius = 6.0, sizeInfluence = 1.9, nodeMargin = 10, ringScale = 0.90, hubDepth = 0.65;
-    
+
     let updateLayoutFn = null, editingNodeId = null;
     const cleanId = str => str.replace(/[^a-zA-Z0-9]/g, '');
 
@@ -226,27 +265,27 @@
     function updateHighwayIds(oldId, newId) { nodesData.forEach(node => { node.imports.forEach(imp => { if (imp.id === oldId) imp.id = newId; }); }); }
 
     function setupSliders() {
-        const sync = (id, rootVar, varName, isOpac=false) => { 
+        const sync = (id, rootVar, varName, isOpac=false) => {
             const el = document.getElementById(id);
             if(el) {
-                el.oninput = function() { 
+                el.oninput = function() {
                     const val = parseFloat(this.value);
                     if(varName === 'w1') w1 = val; if(varName === 'o1') o1 = val;
                     if(varName === 'w2') w2 = val; if(varName === 'o2') o2 = val;
                     if(varName === 'w3') w3 = val; if(varName === 'o3') o3 = val;
-                    
+
                     const suffix = isOpac ? '' : 'px';
-                    document.documentElement.style.setProperty(rootVar, this.value + suffix); 
-                    
+                    document.documentElement.style.setProperty(rootVar, this.value + suffix);
+
                     const textEl = document.getElementById(id.replace("slider-", "val-"));
-                    if(textEl) textEl.innerText = this.value + suffix; 
-                }; 
+                    if(textEl) textEl.innerText = this.value + suffix;
+                };
             }
         };
-        
+
         sync("slider-w1", "--link-width-1", "w1"); sync("slider-w2", "--link-width-2", "w2"); sync("slider-w3", "--link-width-3", "w3");
         sync("slider-o1", "--link-opacity-1", "o1", true); sync("slider-o2", "--link-opacity-2", "o2", true); sync("slider-o3", "--link-opacity-3", "o3", true);
-        
+
         document.getElementById("tension-slider").oninput = function() { tension = +this.value; document.getElementById("tension-val").innerText = tension.toFixed(2); updateLayoutFn(); };
         document.getElementById("ring-slider").oninput = function() { ringScale = +this.value; document.getElementById("ring-val").innerText = ringScale.toFixed(2) + "x"; updateLayoutFn(); };
         document.getElementById("hub-slider").oninput = function() { hubDepth = +this.value; document.getElementById("hub-val").innerText = hubDepth.toFixed(2); updateLayoutFn(); };
@@ -263,7 +302,7 @@
         document.getElementById('btn-view').className = isEditMode ? 'mode-btn' : 'mode-btn active';
         document.getElementById('btn-edit').className = isEditMode ? 'mode-btn edit-active' : 'mode-btn';
         document.getElementById('edit-tools').style.display = isEditMode ? 'block' : 'none';
-        
+
         const toast = document.getElementById('edit-toast');
         toast.style.opacity = isEditMode ? '1' : '0';
         toast.innerText = "EDIT MODE ACTIVE";
@@ -289,33 +328,33 @@
     function clearLinesOnly() { if(confirm("Permanently delete all highway connections?")) { nodesData.forEach(n => n.imports = []); drawChart(); } }
 
     function drawChart() {
-        d3.select("#chart").html(""); 
-        if(nodesData.length === 0) return; 
+        d3.select("#chart").html("");
+        if(nodesData.length === 0) return;
 
         const table = [{id: "root", parentId: null}];
         Object.keys(currentColors).forEach(g => table.push({id: g, parentId: "root"}));
         nodesData.forEach(d => table.push({ ...d, parentId: d.group }));
 
         const root = d3.stratify().id(d => d.id).parentId(d => d.parentId)(table);
-        
+
         // Helper to safely get the number of connections for sizes/opacity
         const getImportsLen = (node) => (node.data && node.data.imports) ? node.data.imports.length : 0;
-        
+
         let dynamicRadius = (Math.min(width, height)/2 - 350) * ringScale;
         const cluster = d3.cluster().size([2 * Math.PI, dynamicRadius]).separation((a, b) => {
             const rA = isSizeHeatmap ? (nodeRadius + (getImportsLen(a) * sizeInfluence)) : nodeRadius;
             const rB = isSizeHeatmap ? (nodeRadius + (getImportsLen(b) * sizeInfluence)) : nodeRadius;
             return (a.parent === b.parent ? 1.0 : 2.5) * ((rA + rB + nodeMargin) / dynamicRadius);
         });
-        
+
         cluster(root); root.each(d => { if (d.depth === 1) d.y = dynamicRadius * hubDepth; });
 
         const svg = d3.select("#chart").append("svg").attr("width", width).attr("height", height);
         const g = svg.append("g").attr("transform", `translate(${width/2},${height/2})`);
-        
+
         const nodeById = new Map(root.leaves().map(d => [d.id, d])), links = [];
         root.leaves().forEach(d => { if (d.data.imports) d.data.imports.forEach(imp => { const t = nodeById.get(imp.id); if (t && d.id < t.id) { const p = d.path(t); p.connType = imp.type || 1; p.sourceNode = d; p.targetNode = t; links.push(p); } }); });
-        
+
         const line = d3.lineRadial().curve(d3.curveBundle.beta(tension)).radius(d => d.y).angle(d => d.x);
         const linkElements = g.append("g").selectAll("path").data(links).join("path")
             .attr("class", d => "link" + (isEditMode ? " edit-mode" : ""))
@@ -352,17 +391,17 @@
         // Bulletproof layout update function guarantees scaling and heatmap apply correctly
         updateLayoutFn = () => {
             dynamicRadius = (Math.min(width, height)/2 - 350) * ringScale;
-            cluster.size([2 * Math.PI, dynamicRadius])(root); 
+            cluster.size([2 * Math.PI, dynamicRadius])(root);
             root.each(d => { if (d.depth === 1) d.y = dynamicRadius * hubDepth; });
-            
-            line.curve(d3.curveBundle.beta(tension)); 
+
+            line.curve(d3.curveBundle.beta(tension));
             linkElements.attr("d", d => line(d));
             nodeSelection.attr("transform", d => `rotate(${d.x * 180 / Math.PI - 90}) translate(${d.y},0)`);
-            
+
             nodeSelection.select("circle")
                 .attr("r", d => isSizeHeatmap ? (nodeRadius + (getImportsLen(d) * sizeInfluence)) : nodeRadius)
                 .style("opacity", d => isHeatmap ? opScale(getImportsLen(d)) : 1);
-                
+
             nodeSelection.select("text")
                 .attr("x", d => { const curR = isSizeHeatmap ? (nodeRadius + (getImportsLen(d) * sizeInfluence)) : nodeRadius; return d.x < Math.PI ? curR + 10 : -(curR + 10); })
                 .text(d => isHeatmap ? `${d.data.name} (${getImportsLen(d)})` : d.data.name);
@@ -378,9 +417,9 @@
             d3.select(this).classed("faded", false).classed("highlighted", true);
             const activeLinks = linkElements.filter(l => l.sourceNode.id === d.id || l.targetNode.id === d.id);
             activeLinks.classed("faded", false).classed("highlighted", true).raise();
-            activeLinks.each(l => { 
+            activeLinks.each(l => {
                 d3.selectAll(".node").filter(n => n.id === l.sourceNode.id || n.id === l.targetNode.id)
-                  .classed("faded", false).classed("highlighted", true); 
+                  .classed("faded", false).classed("highlighted", true);
             });
         }).on("mouseout", () => {
             if(isEditMode) return;
@@ -400,7 +439,7 @@
     function getSVGSource(scaleMultiplier = 1) {
         const svgClone = document.querySelector('svg').cloneNode(true);
         svgClone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
-        
+
         if (scaleMultiplier > 1) {
             svgClone.setAttribute("width", width * scaleMultiplier);
             svgClone.setAttribute("height", height * scaleMultiplier);
@@ -421,13 +460,13 @@
         svgClone.insertBefore(styleDef, svgClone.firstChild);
 
         // Guarantee text formatting carries over
-        svgClone.querySelectorAll('text').forEach(t => { 
-            t.setAttribute('font-family', 'sans-serif'); 
-            t.setAttribute('fill', t.style.fill); 
-            t.setAttribute('font-size', '13px'); 
-            t.setAttribute('font-weight', '600'); 
+        svgClone.querySelectorAll('text').forEach(t => {
+            t.setAttribute('font-family', 'sans-serif');
+            t.setAttribute('fill', t.style.fill);
+            t.setAttribute('font-size', '13px');
+            t.setAttribute('font-weight', '600');
         });
-        
+
         return new XMLSerializer().serializeToString(svgClone);
     }
 
@@ -439,13 +478,13 @@
         const canvas = document.createElement("canvas");
         canvas.width = exportW; canvas.height = exportH;
         const ctx = canvas.getContext("2d");
-        
+
         const img = new Image();
         img.onload = () => {
             const bg = document.getElementById('canvas-color').value;
             const trans = document.getElementById('transparent-check').checked;
             if(!trans) { ctx.fillStyle = bg; ctx.fillRect(0,0,exportW,exportH); }
-            
+
             ctx.drawImage(img, 0, 0, exportW, exportH);
             const l = document.createElement("a");
             l.href = canvas.toDataURL("image/png");
@@ -458,7 +497,7 @@
     function playAnimation() {
         const targetTension = parseFloat(document.getElementById('tension-slider').value);
         tension = 1.0; document.getElementById('tension-slider').value = tension; updateLayoutFn();
-        
+
         d3.select(document.getElementById('tension-slider')).transition().duration(10000).ease(d3.easeCubicInOut)
             .tween("tension", function() {
                 const i = d3.interpolate(1.0, targetTension);
@@ -475,37 +514,37 @@
         const scale = parseInt(document.getElementById('export-scale').value);
         const exportW = width * scale;
         const exportH = height * scale;
-        
+
         const toast = document.getElementById('edit-toast');
         toast.style.opacity = '1';
         toast.style.background = "var(--danger)";
-        
+
         const fps = 30;
         const durationSec = 10;
         const totalFrames = fps * durationSec;
-        
+
         const zip = new JSZip();
         const folder = zip.folder("animation_frames");
-        
+
         const canvas = document.createElement("canvas");
         canvas.width = exportW; canvas.height = exportH;
         const ctx = canvas.getContext("2d");
-        
+
         const isTransparent = document.getElementById('transparent-check').checked;
         const bg = document.getElementById('canvas-color').value;
         const targetTension = parseFloat(document.getElementById('tension-slider').value);
 
         for (let frame = 0; frame <= totalFrames; frame++) {
             toast.innerText = `⏳ RENDERING FRAME ${frame}/${totalFrames} at ${scale}x Scale...`;
-            
+
             let t = frame / totalFrames;
             const easeT = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-            
+
             tension = 1.0 - (easeT * (1.0 - targetTension));
             document.getElementById('tension-slider').value = tension;
             document.getElementById('tension-val').innerText = tension.toFixed(2);
             updateLayoutFn();
-            
+
             await new Promise((resolve) => {
                 const img = new Image();
                 img.onload = () => {
@@ -524,7 +563,7 @@
                 img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(getSVGSource(scale))));
             });
         }
-        
+
         tension = targetTension;
         document.getElementById('tension-slider').value = tension;
         document.getElementById('tension-val').innerText = tension.toFixed(2);
@@ -539,7 +578,7 @@
             a.href = URL.createObjectURL(content);
             a.download = `animation_sequence_${scale}x.zip`;
             a.click();
-            
+
             toast.innerText = "✅ SEQUENCE SAVED!";
             toast.style.background = "#2A9D8F";
             toast.style.color = "white";
